@@ -7,66 +7,89 @@ using UnityEngine.Android;
 
 public class AndroidPermissionHandler : MonoBehaviour
 {
-	bool isItPermissionTime = false;
-	string nextPermission;
-	Stack<string> permissions = new Stack<string>();
+	public static AndroidPermissionHandler instance;
 
-	void Start()
-    {
-		OpenAllPermissions();
+	private bool _isPermissionRequestAskingProcessOnGoing = false;
+	private Stack<string> _permissions = new Stack<string>();
+	private Delegate _delegate;
+	private int _identifier;
+
+	private void Awake()
+	{
+		if (instance == null)
+			instance = this;
 	}
 
-	public void OpenAllPermissions()
+	#region PublicApi
+	public void RequestSinglePermission(string permission,Delegate completationDelegate,int identifier)
 	{
-		isItPermissionTime = true;
-		CreatePermissionList();
-	
-	}
+		ClearPermissionStack();
+		_permissions.Push(permission);
 
-	void CreatePermissionList()
-	{
-		permissions = new Stack<string>();
-		permissions.Push(Permission.ExternalStorageWrite);
-		permissions.Push(Permission.Camera);
-		permissions.Push(Permission.CoarseLocation);
-		AskForPermissions();
+		RequestMultiplePermission(_permissions, completationDelegate,identifier);
 	}
-
-     void AskForPermissions ()
+	public void RequestMultiplePermission(Stack<string> permissions, Delegate completationDelegate,int identifier)
 	{
-		if (permissions == null || permissions.Count <= 0)
+		this._delegate = completationDelegate;
+		this._identifier = identifier;
+		ClearPermissionStack();
+		this._permissions = permissions;
+		_isPermissionRequestAskingProcessOnGoing = true;
+
+		ShowPermissionDialog();
+	}
+	public bool HasUserPermission(string permission)
+	{
+		return Permission.HasUserAuthorizedPermission(permission);
+	}
+	#endregion PublicApi
+
+	#region PrivateApi
+	private void ShowPermissionDialog ()
+	{
+		if (_permissions == null || _permissions.Count <= 0)
 		{
-			isItPermissionTime = false;
+			CompleteAskingPermission();
 			return;
 		}
-		nextPermission = permissions.Pop();
-
-		if (nextPermission == null)
+		string permission = _permissions.Pop();
+		if (HasUserPermission(permission) == false)
 		{
-			isItPermissionTime = false;
-			return;
-		}
-		if (Permission.HasUserAuthorizedPermission(nextPermission) == false)
-		{
-			Permission.RequestUserPermission(nextPermission);
+			Permission.RequestUserPermission(permission);
 		}
 		else
 		{
-			if (isItPermissionTime == true)
-				AskForPermissions();
+			if (_isPermissionRequestAskingProcessOnGoing == true)
+				ShowPermissionDialog();
 		}
-
-
-		Debug.Log("Unity>> permission " + nextPermission + "  status ;" + Permission.HasUserAuthorizedPermission(nextPermission));
-
+		Debug.Log("Unity>> permission " + permission + "  status ;" + Permission.HasUserAuthorizedPermission(permission));
 	}
-
+	private void CompleteAskingPermission()
+	{
+		_isPermissionRequestAskingProcessOnGoing = false;
+		if (_delegate != null)
+			_delegate.OnCompleteAskingPermissionRequest(_identifier);
+	}
 	private void OnApplicationFocus(bool focus)
 	{
-		Debug.Log("Unity>> focus ....  " + focus + "   isPermissionTime : " + isItPermissionTime);
-		if (focus == true && isItPermissionTime == true)
+		Debug.Log("Unity>> focus ....  " + focus + "   isPermissionTime : " + _isPermissionRequestAskingProcessOnGoing);
+		if (focus == true && _isPermissionRequestAskingProcessOnGoing == true)
 		{
-			AskForPermissions();
+			ShowPermissionDialog();
 		}
+	}
+	private void ClearPermissionStack()
+	{
+		if(_permissions == null)
+			_permissions = new Stack<string>();
+
+		_permissions.Clear();
+	}
+
+# endregion PrivateApi
+
+	public interface Delegate
+	{
+		void OnCompleteAskingPermissionRequest( int identifier);
 	}
 }
