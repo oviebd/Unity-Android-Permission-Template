@@ -23,10 +23,9 @@ public class AndroidPermissionHandler : MonoBehaviour
 	#region PublicApi
 	public void RequestSinglePermission(string permission,Delegate completationDelegate,int identifier)
 	{
-		ClearPermissionStack();
-		_permissions.Push(permission);
-
-		RequestMultiplePermission(_permissions, completationDelegate,identifier);
+		Stack<string> permissions = new Stack<string>();
+		permissions.Push(permission);
+		RequestMultiplePermission(permissions, completationDelegate,identifier);
 	}
 	public void RequestMultiplePermission(Stack<string> permissions, Delegate completationDelegate,int identifier)
 	{
@@ -43,6 +42,7 @@ public class AndroidPermissionHandler : MonoBehaviour
 		return Permission.HasUserAuthorizedPermission(permission);
 	}
 	#endregion PublicApi
+
 
 	#region PrivateApi
 	private void ShowPermissionDialog ()
